@@ -48,7 +48,13 @@ static bool match_hisyncid(const void *data, const void *user_data)
 	const struct bt_asha_set *set = data;
 	const struct bt_asha *asha = user_data;
 
-	return (memcmp(set->hisyncid, asha->hisyncid, 8) == 0);
+	uint8_t compare = memcmp(
+		set->hisyncid,
+		asha->properties.hisyncID,
+		sizeof(asha->properties.hisyncID)
+	);
+
+	return !compare;
 }
 
 static struct bt_asha_set *find_asha_set(struct bt_asha *asha)
@@ -60,61 +66,34 @@ static uint8_t is_other_connected(struct bt_asha *asha)
 {
 	struct bt_asha_set *set = find_asha_set(asha);
 
-	if (set) {
-		if (asha->right_side && set->left) {
-			DBG("ASHA right and left side connected");
-			return 1;
-		}
-		if (!asha->right_side && set->right) {
-			DBG("ASHA left and right side connected");
-			return 1;
-		}
-	}
+	DBG("ASHA %s side connected", SIDE_STR[asha->properties.side]);
 
-	if (asha->right_side)
-		DBG("ASHA right side connected");
-	else
-		DBG("ASHA left side connected");
+	if (!set)                                        return 0;
+	if (!set->side[(asha->properties.side + 1) % 2]) return 0;
 
-	return 0;
+	DBG("ASHA both sides connected");
+	return 1;
 }
 
 static void update_asha_set(struct bt_asha *asha, bool connected)
 {
 	struct bt_asha_set *set;
-
 	set = queue_find(asha_devices, match_hisyncid, asha);
 
-	if (connected) {
-		if (!set) {
-			set = new0(struct bt_asha_set, 1);
-			memcpy(set->hisyncid, asha->hisyncid, 8);
-			queue_push_tail(asha_devices, set);
-			DBG("Created ASHA set");
-		}
+	enum device_side_t side = asha->properties.side;
 
-		if (asha->right_side) {
-			set->right = asha;
-			DBG("Right side registered for ASHA set");
-		} else {
-			set->left = asha;
-			DBG("Left side registered for ASHA set");
-		}
-	} else {
+	if (!connected) {
 		if (!set) {
 			error("Missing ASHA set");
 			return;
 		}
 
-		if (asha->right_side && set->right) {
-			set->right = NULL;
-			DBG("Right side unregistered for ASHA set");
-		} else if (!asha->right_side && set->left) {
-			set->left = NULL;
-			DBG("Left side unregistered for ASHA set");
+		if (set->side[side]) {
+			set->side[side] = NULL;
+			DBG("Unregistered %s side for ASHA set", SIDE_STR[side]);
 		}
 
-		if (!set->right && !set->left) {
+		if (!set->side[LEFT] && !set->side[RIGHT]) {
 			if (queue_remove(asha_devices, set)) {
 				free(set);
 				DBG("Freeing ASHA set");
@@ -125,7 +104,23 @@ static void update_asha_set(struct bt_asha *asha, bool connected)
 				asha_devices = NULL;
 			}
 		}
+
+		return;
 	}
+
+	if (!set) {
+		set = new0(struct bt_asha_set, 1);
+		memcpy(
+			set->hisyncid,
+			asha->properties.hisyncID,
+			sizeof(asha->properties.hisyncID)
+		);
+		queue_push_tail(asha_devices, set);
+		DBG("Created ASHA set");
+	}
+
+	set->side[side] = asha;
+	DBG("Registered %s side for ASHA set", SIDE_STR[side]);
 }
 
 static int asha_set_send_status(struct bt_asha *asha, bool other_connected)
@@ -135,19 +130,13 @@ static int asha_set_send_status(struct bt_asha *asha, bool other_connected)
 
 	set = queue_find(asha_devices, match_hisyncid, asha);
 
-	if (set) {
-		if (asha->right_side && set->left) {
-			ret = bt_asha_status(set->left, other_connected);
-			DBG("ASHA left side update: %d, ret: %d",
-					other_connected, ret);
-		}
+	enum device_side_t side = asha->properties.side;
 
-		if (!asha->right_side && set->right) {
-			ret = bt_asha_status(set->right, other_connected);
-			DBG("ASHA right side update: %d, ret: %d",
-					other_connected, ret);
-		}
-	}
+	if (!set)             return ret;
+	if (!set->side[side]) return ret;
+
+	ret = bt_asha_status(set->side[side], other_connected);
+	DBG("ASHA %s side update: %d, ret: %d",	side, other_connected, ret);
 
 	return ret;
 }
@@ -156,7 +145,7 @@ struct bt_asha *bt_asha_new(void)
 {
 	struct bt_asha *asha;
 
-	asha = new0(struct bt_asha, 1);
+	asha = malloc(sizeof(bt_asha));
 
 	return asha;
 }
@@ -406,23 +395,16 @@ static void read_rops(bool success,
 		return;
 	}
 
-	/* Device Capabilities */
-	asha->right_side = (value[1] & 0x1) != 0;
-	asha->binaural = (value[1] & 0x2) != 0;
-	asha->csis_supported = (value[1] & 0x4) != 0;
-	/* HiSyncId: 2 byte company id, 6 byte ID shared by left and right */
-	memcpy(asha->hisyncid, &value[2], 8);
-	/* FeatureMap */
-	asha->coc_streaming_supported = (value[10] & 0x1) != 0;
-	/* RenderDelay */
-	asha->render_delay = get_le16(&value[11]);
-	/* byte 13 & 14 are reserved */
-	/* Codec IDs */
-	asha->codec_ids = get_le16(&value[15]);
+	// Copy into field
+	memcpy(&asha->properties, value, 17);
+
 
 	DBG("Got ROPS: side %u, binaural %u, csis: %u, delay %u, codecs: %u",
-			asha->right_side, asha->binaural, asha->csis_supported,
-			asha->render_delay, asha->codec_ids);
+		asha->properties.side,
+		asha->properties.hasPair,
+		asha->properties.hasCSIS,
+		asha->properties.renderDelay,
+		asha->properties.codecsAvailable);
 
 	check_probe_done(asha);
 }

@@ -10,6 +10,7 @@
  *
  */
 
+#include <cstdint>
 #
 
 #include <stdbool.h>
@@ -24,6 +25,31 @@ enum bt_asha_state_t {
 typedef void (*bt_asha_cb_t)(int status, void *data);
 typedef void (*bt_asha_attach_cb_t)(void *data);
 
+enum device_side_t : uint8_t {
+	LEFT  = 0,
+	RIGHT = 1
+};
+
+static const char* SIDE_STR[2] = {"LEFT", "RIGHT"};
+
+enum supported_codecs_t : uint16_t {
+	G722 = 0x02
+};
+
+struct asha_read_only_properties{
+	uint8_t             version;
+	device_side_t       side     :1;
+	bool                hasPair  :1;
+	bool                hasCSIS  :1;
+	uint8_t             reserved:5;
+	uint16_t            companyID;
+	uint8_t             hisyncID[6];
+	bool                hasCoC;
+	uint16_t            renderDelay;
+	uint16_t            futureUse;
+	supported_codecs_t  codecsAvailable;
+};
+
 struct bt_asha {
 	struct bt_gatt_client *client;
 	struct gatt_db *db;
@@ -32,14 +58,8 @@ struct bt_asha {
 	uint16_t volume_handle;
 	unsigned int status_notify_id;
 
-	uint16_t psm;
-	bool right_side;
-	bool binaural;
-	bool csis_supported;
-	bool coc_streaming_supported;
-	uint8_t hisyncid[8];
-	uint16_t render_delay;
-	uint16_t codec_ids;
+	asha_read_only_properties properties;
+
 	int8_t volume;
 
 	enum bt_asha_state_t state;
@@ -51,9 +71,8 @@ struct bt_asha {
 };
 
 struct bt_asha_set {
-	uint8_t hisyncid[8];
-	struct bt_asha *left;
-	struct bt_asha *right;
+	uint8_t hisyncid[6];
+	struct bt_asha *side[2];
 };
 
 struct bt_asha *bt_asha_new(void);
