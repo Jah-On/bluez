@@ -53,6 +53,8 @@ int adapter_init(void);
 void adapter_cleanup(void);
 void adapter_shutdown(void);
 
+void btd_adapter_foreach(adapter_cb func, gpointer user_data);
+
 typedef void (*btd_disconnect_cb) (struct btd_device *device, uint8_t reason);
 void btd_add_disconnect_cb(btd_disconnect_cb func);
 void btd_remove_disconnect_cb(btd_disconnect_cb func);
@@ -63,7 +65,6 @@ void btd_remove_conn_fail_cb(btd_conn_fail_cb func);
 
 struct btd_adapter *adapter_find(const bdaddr_t *sba);
 struct btd_adapter *adapter_find_by_id(int id);
-void adapter_foreach(adapter_cb func, gpointer user_data);
 
 bool btd_adapter_get_pairable(struct btd_adapter *adapter);
 bool btd_adapter_get_powered(struct btd_adapter *adapter);
@@ -100,7 +101,6 @@ const char *adapter_get_path(struct btd_adapter *adapter);
 const bdaddr_t *btd_adapter_get_address(struct btd_adapter *adapter);
 uint8_t btd_adapter_get_address_type(struct btd_adapter *adapter);
 const char *btd_adapter_get_storage_dir(struct btd_adapter *adapter);
-int adapter_set_name(struct btd_adapter *adapter, const char *name);
 
 int adapter_service_add(struct btd_adapter *adapter, sdp_record_t *rec);
 void adapter_service_remove(struct btd_adapter *adapter, uint32_t handle);
@@ -114,6 +114,7 @@ void btd_adapter_unref(struct btd_adapter *adapter);
 
 void btd_adapter_set_class(struct btd_adapter *adapter, uint8_t major,
 							uint8_t minor);
+int btd_adapter_set_name(struct btd_adapter *adapter, const char *name);
 
 struct btd_adapter_driver {
 	const char *name;
@@ -139,8 +140,8 @@ typedef void (*service_auth_cb) (DBusError *derr, void *user_data);
 
 void adapter_add_profile(struct btd_adapter *adapter, gpointer p);
 void adapter_remove_profile(struct btd_adapter *adapter, gpointer p);
-int btd_register_adapter_driver(struct btd_adapter_driver *driver);
-void btd_unregister_adapter_driver(struct btd_adapter_driver *driver);
+int btd_register_adapter_driver(const struct btd_adapter_driver *driver);
+void btd_unregister_adapter_driver(const struct btd_adapter_driver *driver);
 guint btd_request_authorization(const bdaddr_t *src, const bdaddr_t *dst,
 		const char *uuid, service_auth_cb cb, void *user_data);
 guint btd_request_authorization_cable_configured(const bdaddr_t *src, const bdaddr_t *dst,

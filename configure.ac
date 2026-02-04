@@ -162,10 +162,6 @@ AC_ARG_ENABLE(nfc, AS_HELP_STRING([--enable-nfc],
 		[enable NFC pairing]), [enable_nfc=${enableval}])
 AM_CONDITIONAL(NFC, test "${enable_nfc}" = "yes")
 
-AC_ARG_ENABLE(sap, AS_HELP_STRING([--enable-sap],
-		[enable SAP profile]), [enable_sap=${enableval}])
-AM_CONDITIONAL(SAP, test "${enable_sap}" = "yes")
-
 AC_ARG_ENABLE(a2dp, AS_HELP_STRING([--disable-a2dp],
 		[disable A2DP profile]), [enable_a2dp=${enableval}])
 AM_CONDITIONAL(A2DP, test "${enable_a2dp}" != "no")
@@ -191,10 +187,6 @@ AM_CONDITIONAL(HID, test "${enable_hid}" != "no")
 AC_ARG_ENABLE(hog, AS_HELP_STRING([--disable-hog],
 		[disable HoG profile]), [enable_hog=${enableval}])
 AM_CONDITIONAL(HOG, test "${enable_hog}" != "no")
-
-AC_ARG_ENABLE(health, AS_HELP_STRING([--enable-health],
-		[enable health profiles]), [enable_health=${enableval}])
-AM_CONDITIONAL(HEALTH, test "${enable_health}" = "yes")
 
 AC_ARG_ENABLE(bap, AS_HELP_STRING([--disable-bap],
 		[disable BAP profile]), [enable_bap=${enableval}])
@@ -523,11 +515,11 @@ AC_SUBST(PLUGIN_PHONEBOOK, [${plugin_phonebook}])
 AC_CONFIG_FILES(
 	lib/bluez.pc
 	Makefile
-	mesh/bluetooth-meshd.rst
+	doc/bluetooth-meshd.rst
 	mesh/bluetooth-mesh.service
 	obexd/src/obex.service
 	obexd/src/org.bluez.obex.service
-	src/bluetoothd.rst
+	doc/bluetoothd.rst
 	src/bluetooth.service
 	tools/bluetooth-logger.service
 	tools/mpris-proxy.service

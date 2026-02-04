@@ -248,7 +248,9 @@ shared_sources = src/shared/io.h src/shared/timeout.h \
 			src/shared/bap-defs.h \
 			src/shared/asha.h src/shared/asha.c \
 			src/shared/battery.h src/shared/battery.c \
-			src/shared/uinput.h src/shared/uinput.c
+			src/shared/uinput.h src/shared/uinput.c \
+			src/shared/rap.h src/shared/rap.c
+
 
 if READLINE
 shared_sources += src/shared/shell.c src/shared/shell.h
@@ -364,7 +366,7 @@ nodist_src_bluetoothd_SOURCES = $(builtin_files)
 CLEANFILES += $(builtin_files)
 
 if MANPAGES
-man_MANS += src/bluetoothd.8
+man_MANS += doc/bluetoothd.8
 man_MANS += doc/hci.7 doc/mgmt.7 doc/l2cap.7 doc/rfcomm.7 doc/sco.7 doc/iso.7
 man_MANS += doc/org.bluez.Adapter.5 doc/org.bluez.Device.5 \
 		doc/org.bluez.Bearer.LE.5 doc/org.bluez.Bearer.BREDR.5 \
@@ -399,8 +401,11 @@ man_MANS += doc/org.bluez.obex.Client.5 doc/org.bluez.obex.Session.5 \
 		doc/org.bluez.obex.AgentManager.5 doc/org.bluez.obex.Agent.5 \
 		doc/org.bluez.obex.Image.5
 man_MANS += doc/org.bluez.Telephony.5 doc/org.bluez.Call.5
+man_MANS += doc/org.bluez.ThermometerManager.5 \
+		doc/org.bluez.Thermometer.5 \
+		doc/org.bluez.ThermometerWatcher.5
 endif
-manual_pages += src/bluetoothd.8
+manual_pages += doc/bluetoothd.8
 manual_pages += doc/hci.7 doc/mgmt.7 doc/l2cap.7 doc/rfcomm.7 doc/sco.7 \
 		doc/iso.7
 manual_pages += doc/org.bluez.Adapter.5 doc/org.bluez.Device.5 \
@@ -436,6 +441,9 @@ manual_pages += doc/org.bluez.obex.Client.5 doc/org.bluez.obex.Session.5 \
 		doc/org.bluez.obex.AgentManager.5 doc/org.bluez.obex.Agent.5 \
 		doc/org.bluez.obex.Image.5
 manual_pages += doc/org.bluez.Telephony.5 doc/org.bluez.Call.5
+manual_pages += doc/org.bluez.ThermometerManager.5 \
+		doc/org.bluez.Thermometer.5 \
+		doc/org.bluez.ThermometerWatcher.5
 
 EXTRA_DIST += src/genbuiltin src/bluetooth.conf \
 			src/main.conf profiles/network/network.conf \
@@ -473,16 +481,14 @@ endif
 
 EXTRA_DIST += $(test_scripts)
 
-EXTRA_DIST += doc/assigned-numbers.txt doc/supported-features.txt \
+EXTRA_DIST += doc/assigned-numbers.rst doc/supported-features.txt \
 				doc/test-coverage.txt \
 				doc/test-runner.rst \
 				doc/settings-storage.txt
 
-EXTRA_DIST += doc/health-api.txt \
-		doc/sap-api.txt
-
-EXTRA_DIST += doc/hci.rst doc/mgmt.rst doc/l2cap.rst doc/rfcomm.rst \
-	      doc/sco.rst doc/iso.rst
+EXTRA_DIST += doc/hci-protocol.rst doc/mgmt-protocol.rst \
+	      doc/l2cap-protocol.rst doc/rfcomm-protocol.rst \
+	      doc/sco-protocol.rst doc/iso-protocol.rst
 
 EXTRA_DIST += doc/org.bluez.Adapter.rst doc/org.bluez.Device.rst \
 		doc/org.bluez.Bearer.LE.rst doc/org.bluez.Bearer.BREDR.rst \
@@ -521,6 +527,10 @@ EXTRA_DIST += doc/org.bluez.obex.Client.rst doc/org.bluez.obex.Session.rst \
 		doc/org.bluez.obex.Image.rst
 
 EXTRA_DIST += doc/org.bluez.Telephony.rst doc/org.bluez.Call.rst
+
+EXTRA_DIST += doc/org.bluez.ThermometerManager.rst \
+	      doc/org.bluez.Thermometer.rst \
+	      doc/org.bluez.ThermometerWatcher.rst
 
 EXTRA_DIST += doc/pics-opp.txt doc/pixit-opp.txt \
 		doc/pts-opp.txt
@@ -744,6 +754,12 @@ unit_test_battery_SOURCES = unit/test-battery.c
 unit_test_battery_LDADD = src/libshared-glib.la \
 				lib/libbluetooth-internal.la $(GLIB_LIBS)
 
+unit_tests += unit/test-rap
+
+unit_test_rap_SOURCES = unit/test-rap.c $(btio_sources)
+unit_test_rap_LDADD = src/libshared-glib.la \
+				lib/libbluetooth-internal.la $(GLIB_LIBS)
+
 if MIDI
 unit_tests += unit/test-midi
 unit_test_midi_CPPFLAGS = $(AM_CPPFLAGS) $(ALSA_CFLAGS) -DMIDI_TEST
@@ -790,7 +806,6 @@ EXTRA_DIST += $(manual_pages) $(patsubst %.1,%.rst, \
 
 # pkg-config gives absolute paths that do not work with distcheck that wants to use its own $(prefix)
 AM_DISTCHECK_CONFIGURE_FLAGS = --disable-datafiles --enable-library \
-						--enable-health \
 						--enable-midi \
 						--enable-manpages \
 						--enable-mesh \
@@ -825,7 +840,7 @@ endif
 %.5: %.rst Makefile
 	$(RST2MAN_PROCESS)
 
-%.7: %.rst Makefile
+%.7: %-protocol.rst Makefile
 	$(RST2MAN_PROCESS)
 
 %.8: %.rst Makefile

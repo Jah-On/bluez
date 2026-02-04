@@ -998,7 +998,7 @@ static int set_name(struct btd_adapter *adapter, const char *name)
 	return -EIO;
 }
 
-int adapter_set_name(struct btd_adapter *adapter, const char *name)
+int btd_adapter_set_name(struct btd_adapter *adapter, const char *name)
 {
 	if (g_strcmp0(adapter->system_name, name) == 0)
 		return 0;
@@ -3879,14 +3879,15 @@ static void add_uuid_to_uuid_set(void *data, void *user_data)
 static guint bt_uuid_hash(gconstpointer key)
 {
 	const bt_uuid_t *uuid = key;
-	uint64_t uuid_128[2];
+	bt_uuid_t my_uuid;
 
 	if (!uuid)
 		return 0;
 
-	bt_uuid_to_uuid128(uuid, (bt_uuid_t *)uuid_128);
+	bt_uuid_to_uuid128(uuid, &my_uuid);
 
-	return g_int64_hash(uuid_128) ^ g_int64_hash(uuid_128+1);
+	return g_int64_hash(&my_uuid.value.u128.data[0]) ^
+		g_int64_hash(&my_uuid.value.u128.data[8]);
 }
 
 static gboolean bt_uuid_equal(gconstpointer v1, gconstpointer v2)
@@ -7696,7 +7697,7 @@ static void adapter_stop(struct btd_adapter *adapter)
 	DBG("adapter %s has been disabled", adapter->path);
 }
 
-int btd_register_adapter_driver(struct btd_adapter_driver *driver)
+int btd_register_adapter_driver(const struct btd_adapter_driver *driver)
 {
 	if (driver->experimental && !(g_dbus_get_flags() &
 					G_DBUS_FLAG_ENABLE_EXPERIMENTAL)) {
@@ -7704,12 +7705,12 @@ int btd_register_adapter_driver(struct btd_adapter_driver *driver)
 		return -ENOTSUP;
 	}
 
-	adapter_drivers = g_slist_append(adapter_drivers, driver);
+	adapter_drivers = g_slist_append(adapter_drivers, (void *) driver);
 
 	if (driver->probe == NULL)
 		return 0;
 
-	adapter_foreach(probe_driver, driver);
+	btd_adapter_foreach(probe_driver, (void *) driver);
 
 	return 0;
 }
@@ -7724,11 +7725,11 @@ static void unload_driver(struct btd_adapter *adapter, gpointer data)
 	adapter->drivers = g_slist_remove(adapter->drivers, data);
 }
 
-void btd_unregister_adapter_driver(struct btd_adapter_driver *driver)
+void btd_unregister_adapter_driver(const struct btd_adapter_driver *driver)
 {
-	adapter_drivers = g_slist_remove(adapter_drivers, driver);
+	adapter_drivers = g_slist_remove(adapter_drivers, (void *) driver);
 
-	adapter_foreach(unload_driver, driver);
+	btd_adapter_foreach(unload_driver, (void *) driver);
 }
 
 static void agent_auth_cb(struct agent *agent, DBusError *derr,
@@ -9332,7 +9333,7 @@ struct btd_adapter *adapter_find_by_id(int id)
 	return match->data;
 }
 
-void adapter_foreach(adapter_cb func, gpointer user_data)
+void btd_adapter_foreach(adapter_cb func, gpointer user_data)
 {
 	g_slist_foreach(adapters, (GFunc) func, user_data);
 }
